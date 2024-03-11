@@ -7,6 +7,7 @@ import com.example.photogallery.model.GalleryItem
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import retrofit2.http.Query
 
 private const val TAG = "PhotoGalleryViewModel"
 
@@ -22,8 +23,7 @@ class PhotoGalleryViewModel : ViewModel() {
     init {
         viewModelScope.launch {
             try {
-//                val items = photoRepository.fetchPhotos()
-                val items = photoRepository.searchPhotos("bicycle")
+                val items = fetchGalleryItems("planets")
                 Log.d(TAG, "$items")
                 _galleryItems.value = items
             } catch (ex: Exception) {
@@ -32,4 +32,15 @@ class PhotoGalleryViewModel : ViewModel() {
         }
     }
 
+    fun setQuery(query: String) {
+        viewModelScope.launch { _galleryItems.value = fetchGalleryItems(query)}
+    }
+
+    private suspend fun fetchGalleryItems(query: String): List<GalleryItem> {
+        return if (query.isNotEmpty()) {
+            photoRepository.searchPhotos(query)
+        } else {
+            photoRepository.fetchPhotos()
+        }
+    }
 }
