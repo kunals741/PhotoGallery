@@ -5,7 +5,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.photogallery.model.GalleryItem
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import retrofit2.http.Query
 
@@ -14,26 +17,35 @@ private const val TAG = "PhotoGalleryViewModel"
 class PhotoGalleryViewModel : ViewModel() {
 
     private val photoRepository = PhotoRepository()
+    private val preferenceRepository = PreferenceRepository.get()
 
-    private val _galleryItems: MutableStateFlow<List<GalleryItem>> =
-        MutableStateFlow(emptyList())
-    val galleryItems
-        get() = _galleryItems.asStateFlow()
+    private val _uiState: MutableStateFlow<PhotoGalleryUiState> = MutableStateFlow(
+        PhotoGalleryUiState()
+    )
+    val uiState: StateFlow<PhotoGalleryUiState>
+        get() = _uiState.asStateFlow()
+
 
     init {
         viewModelScope.launch {
-            try {
-                val items = fetchGalleryItems("planets")
-                Log.d(TAG, "$items")
-                _galleryItems.value = items
-            } catch (ex: Exception) {
-                Log.e(TAG, "Failed to fetch gallery items", ex)
+            preferenceRepository.storedQuery.collectLatest { storedQuery ->
+                try {
+                    val items = fetchGalleryItems(storedQuery)
+                    _uiState.update { oldState ->
+                        oldState.copy(
+                            images = items,
+                            query = storedQuery
+                        )
+                    }
+                } catch (ex: Exception) {
+                    Log.e(TAG, "Failed to fetch gallery items", ex)
+                }
             }
         }
     }
 
     fun setQuery(query: String) {
-        viewModelScope.launch { _galleryItems.value = fetchGalleryItems(query)}
+        viewModelScope.launch { preferenceRepository.setStoredQuery(query) }
     }
 
     private suspend fun fetchGalleryItems(query: String): List<GalleryItem> {
@@ -44,3 +56,8 @@ class PhotoGalleryViewModel : ViewModel() {
         }
     }
 }
+
+data class PhotoGalleryUiState(
+    val images: List<GalleryItem> = listOf(),
+    val query: String = ""
+)
